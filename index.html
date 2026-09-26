@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Live Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen p-6">
+
+    <div class="max-w-5xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">Live Cloud Dashboard</h1>
+                <p class="text-sm text-slate-500" id="sync-status">Connecting to cloud...</p>
+            </div>
+            <button onclick="fetchCloudData()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm">
+                Refresh Now
+            </button>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Total Records</h3>
+                <p class="text-3xl font-extrabold text-slate-700 mt-2" id="metric-rows">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Status</h3>
+                <p class="text-lg font-bold text-emerald-600 mt-3" id="metric-status">Active & Synced</p>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Performance Overview</h3>
+            <div class="relative h-80 w-full">
+                <canvas id="dashboardChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// Replace with your actual GitHub username and repository name
+    const GITHUB_USER = 'shanakhtar85';
+    const REPO_NAME = 'excel-dashboard-data';
+    
+    // jsDelivr CDN link correctly formatted with variables
+    // This calls your secure private Netlify function instead of a public link
+	const API_URL = '/.netlify/functions/get-data';
+
+    let myChart = null;
+
+    async function fetchCloudData() {
+        const statusEl = document.getElementById('sync-status');
+        statusEl.textContent = 'Fetching latest data...';
+
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error('Failed to fetch data from cloud');
+            
+            // GitHub direct file returns the array directly (unlike JSONBin which used result.record)
+            const data = await response.json();
+
+            if (!Array.isArray(data) || data.length === 0) {
+                statusEl.textContent = 'Data format error or empty.';
+                return;
+            }
+
+            // Update metrics
+            document.getElementById('metric-rows').textContent = data.length;
+            statusEl.textContent = `Last synced: ${new Date().toLocaleTimeString()}`;
+
+            // Extract keys dynamically
+            const keys = Object.keys(data[0]);
+            const labelKey = keys[0];
+            const valueKey = keys.find(k => typeof data[0][k] === 'number') || keys[1];
+
+            const labels = data.map(item => item[labelKey]);
+            const values = data.map(item => item[valueKey]);
+
+            renderChart(labels, values, valueKey);
+
+        } catch (error) {
+            console.error(error);
+            statusEl.textContent = 'Error connecting to cloud storage.';
+        }
+    }
+
+    function renderChart(labels, values, labelName) {
+        const ctx = document.getElementById('dashboardChart').getContext('2d');
+        
+        if (myChart) {
+            myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: labelName || 'Value',
+                    data: values,
+                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    // Fetch data immediately when page opens
+    fetchCloudData();
+
+    // Auto-refresh every 60 seconds
+    setInterval(fetchCloudData, 60000);
+</script>
+</body>
+</html>
